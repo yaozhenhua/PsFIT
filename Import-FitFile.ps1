@@ -2,7 +2,8 @@
 Param (
     [ValidateScript({Test-Path $_})]
     [string] $FitFile,
-    [string] $HrvLog = $null)
+    [string] $HrvLog = $null,
+    [switch] $ConvertPosition)
     
 Set-StrictMode -Version 2.0
 
@@ -144,6 +145,9 @@ $mesgBroadcaster.add_LapMesgEvent({
             if ($fieldName -eq "StartTime" -or $fieldName -eq "Timestamp") {
                 $value = $mesg.TimestampToDateTime($value).GetDateTime()
             }
+            elseif ($ConvertPosition -and $fieldName.Contains("PositionL")) {
+                $value *= $global:g_semicircle2degree
+            }
 
             if ($fieldName -ne "unknown") {
                 Add-Member -InputObject $lap NoteProperty $fieldName $value
@@ -175,6 +179,9 @@ $mesgBroadcaster.add_RecordMesgEvent({
 
             if ($fieldName -eq "StartTime" -or $fieldName -eq "Timestamp") {
                 $value = $mesg.TimestampToDateTime($value).GetDateTime()
+            }
+            elseif ($ConvertPosition -and $fieldName.StartsWith("PositionL")) {
+                $value *= $global:g_semicircle2degree
             }
             
             Add-Member -InputObject $record NoteProperty $fieldName $value
@@ -313,6 +320,9 @@ $mesgBroadcaster.add_SessionMesgEvent({
 
             if ($fieldName -eq "StartTime" -or $fieldName -eq "Timestamp") {
                 $value = $mesg.TimestampToDateTime($value).GetDateTime()
+            }
+            elseif ($ConvertPosition -and ($fieldName.Contains("PositionL") -or $fieldName.EndsWith("cLat") -or $fieldName.EndsWith("cLong"))) {
+                $value *= $global:g_semicircle2degree
             }
 
             if ($fieldName -ne "unknown") {
