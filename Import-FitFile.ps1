@@ -37,10 +37,15 @@ Function ConvertManufacturerName($id)
     return "UnknownManufacturer"
 }
 
+$global:g_activity = New-Object PSObject
 $global:g_sessions = @()
 $global:g_laps = @()
 $global:g_records = @()
+$global:g_recoveryHr = 0
+# coefficient to convert GPS location from semicircle unit to degree.
+$global:g_semicircle2degree = 180.0 / [Math]::Pow(2, 31)
 
+# List of known messages that we recognize and unknown ones that we explicitly do not.
 $global:g_knownMesgs = @{
     0 = "FileId";
     1 = "Capabilities";
@@ -62,6 +67,7 @@ $global:g_knownMesgs = @{
     104 = "unknown";
 }
 
+# Action for processing unrecognized messages
 $onMesg = {
     $mesg = $EventArgs.mesg
     $num = [int] $mesg.Num
@@ -72,6 +78,8 @@ $onMesg = {
     
     Write-Warning "OnMesg $num $($mesg.Name)"
     $fieldCount = $mesg.GetNumFields()
+
+    # Prints all the fields at the Verbose mode.
     for ($i = 0; $i -lt $fieldCount; $i++) {
         $field = $mesg.fields[$i]
         $fieldNum = $field.Num
@@ -108,14 +116,13 @@ $mesgBroadcaster.add_ActivityMesgEvent({
     Param ($Sender, $EventArgs)
 
     $mesg = $EventArgs.mesg
-    $activityType = $mesg.GetType()
-    $event = $mesg.GetEvent()
-    $eventType = $mesg.GetEventType()
-    $timestamp = $mesg.GetTimestamp().GetDateTime()
-    $totalTimerTime = $mesg.GetTotalTimerTime()
+    Add-Member -InputObject $global:g_activity NoteProperty Type $mesg.GetType()
+    Add-Member -InputObject $global:g_activity NoteProperty Event $mesg.GetEvent()
+    Add-Member -InputObject $global:g_activity NoteProperty EventType $mesg.GetEventType()
+    Add-Member -InputObject $global:g_activity NoteProperty Timestamp $mesg.GetTimestamp().GetDateTime()
+    Add-Member -InputObject $global:g_activity NoteProperty TotalTimerTime $mesg.GetTotalTimerTime()
     $numSessions = $mesg.GetNumSessions()
-    
-    Write-Host "Activity $activityType $event $eventType Timestamp $timestamp Total timer time = $totalTimerTime Sessions = $numSessions"
+    Write-Host "Activity: Sessions = $numSessions"
 })
 
 $mesgBroadcaster.add_LapMesgEvent({
@@ -218,6 +225,10 @@ $mesgBroadcaster.add_EventMesgEvent({
     $data = $mesg.GetData()
     $time = $mesg.GetTimestamp().GetDateTime()
     Write-Host "$time : $eventType $event event group = $eventGroup data = $data"
+
+    if ($eventType -eq "Marker" -and $event -eq "RecoveryHr") {
+        $global:g_recoveryHr = $data
+    }
 })
 
 $mesgBroadcaster.add_FileCreatorMesgEvent({
@@ -316,6 +327,8 @@ $mesgBroadcaster.add_SessionMesgEvent({
     $session.SubSport = $mesg.GetSubSport()
     $session.Trigger = $mesg.GetTrigger()
 
+    Add-Member -InputObject $session NoteProperty RecoveryHeartRate $global:g_recoveryHr
+
     Add-Member -InputObject $session NoteProperty Laps $global:g_laps
     $global:g_laps = @()
     
@@ -351,6 +364,5 @@ $global:g_sessions.Laps | `
     Sort -Property Timestamp | Format-Table | Out-String | Write-Host
 
 # Generates the activity object
-New-Object PSObject -Property @{
-    Sessions = $global:g_sessions;
-}
+Add-Member -InputObject $global:g_activity NoteProperty Sessions $global:g_sessions
+return $global:g_activity
