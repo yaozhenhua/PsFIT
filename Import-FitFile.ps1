@@ -38,7 +38,12 @@ Function ConvertManufacturerName($id)
     return "UnknownManufacturer"
 }
 
-$global:g_activity = New-Object PSObject
+###################################################################################################
+# Global data accessed by event handlers
+
+$global:g_activity = New-Object PSObject -Property @{
+    FileInfo = New-Object PSObject;
+}
 $global:g_sessions = @()
 $global:g_laps = @()
 $global:g_records = @()
@@ -122,8 +127,9 @@ $mesgBroadcaster.add_ActivityMesgEvent({
     Add-Member -InputObject $global:g_activity NoteProperty EventType $mesg.GetEventType()
     Add-Member -InputObject $global:g_activity NoteProperty Timestamp $mesg.GetTimestamp().GetDateTime()
     Add-Member -InputObject $global:g_activity NoteProperty TotalTimerTime $mesg.GetTotalTimerTime()
+
     $numSessions = $mesg.GetNumSessions()
-    Write-Host "Activity: Sessions = $numSessions"
+    Write-Verbose "Activity has $numSessions sessions"
 })
 
 $mesgBroadcaster.add_LapMesgEvent({
@@ -199,14 +205,12 @@ $mesgBroadcaster.add_FileIdMesgEvent({
     Param ($Sender, $EventArgs)
 
     $mesg = $EventArgs.mesg
-    $fileType = $mesg.GetType()
-    $manufacturer = ConvertManufacturerName $mesg.GetManufacturer()
-    $product = ConvertGarminProductName $mesg.GetProduct()
-    $serialNumber = $mesg.GetSerialNumber()
-    $number = $mesg.GetNumber()
-    $timeCreated = $mesg.GetTimeCreated().GetDateTime()
-    
-    Write-Host "File type = $fileType, $manufacturer $product, Serial Number $serialNumber $number.  Created $timeCreated"
+
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty Type $mesg.GetType()
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty Manufacturer (ConvertManufacturerName $mesg.GetManufacturer())
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty Product (ConvertGarminProductName $mesg.GetProduct())
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty SerialNumber $mesg.GetSerialNumber()
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty TimeCreated $mesg.GetTimeCreated().GetDateTime()
 })
 
 $mesgBroadcaster.add_UserProfileMesgEvent({
@@ -242,9 +246,9 @@ $mesgBroadcaster.add_FileCreatorMesgEvent({
     Param ($Sender, $EventArgs)
 
     $mesg = $EventArgs.mesg
-    $softwareVer = $mesg.GetSoftwareVersion()
-    $hardwareVer = $mesg.GetHardwareVersion()
-    Write-Host "Software version $softwareVer Hardware version $hardwareVer"
+    
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty SoftwareVer $mesg.GetSoftwareVersion()
+    Add-Member -InputObject $global:g_activity.FileInfo NoteProperty HardwareVer $mesg.GetHardwareVersion()
 })
 
 $mesgBroadcaster.add_CapabilitiesMesgEvent({
