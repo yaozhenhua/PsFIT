@@ -23,7 +23,9 @@ foreach ($lap in $Activity.Sessions[0].Laps) {
 
     $lapDistanceFP = 0.0
     foreach ($record in $lap.Records) {
-        if ($record.Speed -eq $null) {
+        # Checks if speed is available
+        $speedProp = $record | Get-Member -MemberType Properties -Name Speed
+        if ($speedProp -eq $null) {
             continue
         }
 
