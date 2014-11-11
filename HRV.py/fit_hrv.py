@@ -83,7 +83,7 @@ def rmssd(datapoints, duration_in_minutes):
     result = math.sqrt(sum_rr_squre / num_rr)
     hrv = math.log(result) * 20
     avg_hr /= len(datapoints)
-    print "Time: {0} HR: {1:.1f} rMSSD: {2:.3f} HRV: {3:.3f} |d_RR|_max: {4}".format(
+    print "{0} HR: {1:.1f} rMSSD: {2:.3f} HRV: {3:.3f} |d_RR|_max: {4}".format(
             datapoints[-1].timestamp, avg_hr, result, hrv, delta)
     return (datapoints[-1].timestamp, avg_hr, result, hrv)
 
@@ -125,6 +125,16 @@ def main():
         elif message.mesg_num == 78:
             if datapoint != None:
                 datapoint.add_hrv(message.get_value('time'))
+        elif message.name == 'event':
+            print '{0} Event: {1} {2} {3}'.format(
+                    message.get_value('timestamp'), message.get_value('event'), message.get_value('event_type'),
+                    message.get_value('data'))
+        elif message.name in ['session', 'lap']:
+            print '{0} {1}'.format(message.get_value('timestamp'), message.name)
+            for f in message.fields:
+                if f.value is None or f.name in ['timestamp']:
+                    continue
+                print '        {0} : {1}'.format(f.name, f.value)
     
     with open('fit_hrv_template.html', 'r') as template:
         with open(output_filename, 'w') as output:
